@@ -1,0 +1,51 @@
+---
+- hosts: all
+  become: yes
+
+  vars_files:
+    - vars/agent_token.yaml
+
+  handlers:
+  - name: Reboot
+    reboot:
+      msg: "Beep Boop Me Reboot"
+
+  pre_tasks:
+  - name: Setting eth0 interface IP address
+    community.general.nmcli:
+      type: ethernet
+      conn_name: eth0
+      ip4: "{{ ip }}"
+      state: present
+
+  - name: Update apt cache
+    apt: update_cache=yes cache_valid_time=3600
+
+  - name: Enable cgroups
+    replace:
+      path: /boot/cmdline.txt
+      regexp: "CH$"
+      replace: "CH cgroup_memory=1 cgroup_enable=memory"
+      backup: true
+    notify: Reboot
+
+  tasks:
+
+  # Download Install Script
+  - name: Download k3s install script
+    get_url:
+      url: https://get.k3s.io/
+      dest: /usr/local/bin/k3s-install.sh
+      mode: '0755'
+
+  # Run install script with agent token parameter
+  - name: Run k3s script on server
+    command: /usr/local/bin/k3s-install.sh --agent-token
+
+
+
+
+  # Copy Kubeconfig on Server
+  # set export KUBECONFIG=~/.kube/config
+  # 
+  # 
