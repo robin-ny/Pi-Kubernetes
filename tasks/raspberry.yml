@@ -5,7 +5,6 @@
     conn_name: "{{ iface }}"
     ip4: "{{ ip }}/24"
     state: present
-  when: inventory_hostname in groups['cluster']
 
 - name: Enable cgroups
   replace:
@@ -13,5 +12,4 @@
     regexp: "CH$"
     replace: "CH cgroup_memory=1 cgroup_enable=memory"
     backup: true
-  when: inventory_hostname in groups['cluster']
   notify: Reboot
