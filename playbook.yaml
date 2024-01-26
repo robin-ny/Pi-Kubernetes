@@ -1,9 +1,9 @@
 ---
-- hosts: all
+- hosts: cluster
   become: yes
 
   vars_files:
-    - vars/agent_token.yaml
+    - vars/agent_token.yml
 
   handlers:
   - name: Reboot
@@ -14,9 +14,10 @@
   - name: Setting eth0 interface IP address
     community.general.nmcli:
       type: ethernet
-      conn_name: eth0
-      ip4: "{{ ip }}"
+      conn_name: "{{ iface }}"
+      ip4: "{{ ip }}/24"
       state: present
+    when: inventory_hostname in groups['cluster']
 
   - name: Update apt cache
     apt: update_cache=yes cache_valid_time=3600
@@ -27,9 +28,8 @@
       regexp: "CH$"
       replace: "CH cgroup_memory=1 cgroup_enable=memory"
       backup: true
+    when: inventory_hostname in groups['cluster']
     notify: Reboot
-
-  tasks:
 
   # Download Install Script
   - name: Download k3s install script
@@ -38,14 +38,41 @@
       dest: /usr/local/bin/k3s-install.sh
       mode: '0755'
 
-  # Run install script with agent token parameter
+  # Run install script on server
   - name: Run k3s script on server
-    command: /usr/local/bin/k3s-install.sh --agent-token
-
-
-
+    command: /usr/local/bin/k3s-install.sh --token {{ agent_token }} --node-external-ip {{ ip }} --flannel-iface {{ iface }}
+    when: inventory_hostname in groups['server']
 
   # Copy Kubeconfig on Server
+  - name: Create .kube folder in {{ ansible_user }} user home
+    file: 
+      path: "~{{ ansible_user }}/.kube"
+      state: directory
+      owner: "{{ ansible_user }}"
+      group: "{{ ansible_user }}"
+      mode: '0700'
+    when: inventory_hostname in groups['server']
+
+  - name: Copy kubeconfig to {{ ansible_user }} home
+    copy:
+      src: /etc/rancher/k3s/k3s.yaml
+      remote_src: true
+      dest: "~{{ ansible_user }}/.kube/config"
+      owner: "{{ ansible_user }}"
+      group: "{{ ansible_user }}"
+      mode: '0600'
+    when: inventory_hostname in groups['server']
+
   # set export KUBECONFIG=~/.kube/config
-  # 
-  # 
+  - name: Set KUBECONFIG environment variable for {{ ansible_user }}
+    lineinfile:
+      dest: "~{{ ansible_user }}/.bashrc"
+      regexp: '^export KUBECONFIG='
+      line: 'export KUBECONFIG=~/.kube/config'
+      state: present
+    when: inventory_hostname in groups['server']
+
+  # Run install script on server
+  - name: Run k3s script on agent
+    command: /usr/local/bin/k3s-install.sh agent --token {{ agent_token }} --server https://{{ server }}:6443 --node-external-ip {{ ip }} --flannel-iface {{ iface }}
+    when: inventory_hostname in groups['agent']
