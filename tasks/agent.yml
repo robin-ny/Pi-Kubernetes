@@ -1,0 +1,4 @@
+---  
+# Run install script on agent
+- name: Run k3s script on agent
+  command: /usr/local/bin/k3s-install.sh agent --token {{ agent_token }} --server https://{{ server }}:6443 --node-external-ip {{ ip }} --flannel-iface {{ iface }}

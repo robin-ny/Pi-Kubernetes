@@ -1,0 +1,30 @@
+---
+# Run install script on server
+- name: Run k3s script on server
+  command: /usr/local/bin/k3s-install.sh --token {{ agent_token }} --node-external-ip {{ ip }} --flannel-iface {{ iface }}
+
+# Copy Kubeconfig on Server
+- name: Create .kube folder in {{ ansible_user }} user home
+  file: 
+    path: "~{{ ansible_user }}/.kube"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0700'
+
+- name: Copy kubeconfig to {{ ansible_user }} home
+  copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    remote_src: true
+    dest: "~{{ ansible_user }}/.kube/config"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+
+# set export KUBECONFIG=~/.kube/config
+- name: Set KUBECONFIG environment variable for {{ ansible_user }}
+  lineinfile:
+    dest: "~{{ ansible_user }}/.bashrc"
+    regexp: '^export KUBECONFIG='
+    line: 'export KUBECONFIG=~/.kube/config'
+    state: present
